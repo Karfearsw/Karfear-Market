@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClient, getSupabaseAdminEnv } from "@/lib/supabase/admin";
 import type {
   AdapterCapability,
   EventType,
@@ -114,7 +114,10 @@ function asCapabilities(v: unknown): AdapterCapability[] {
 
 export async function GET() {
   const supabase = createAdminClient();
-  if (!supabase) return NextResponse.json({ error: "SUPABASE_NOT_CONFIGURED" }, { status: 500 });
+  if (!supabase) {
+    const { missing } = getSupabaseAdminEnv();
+    return NextResponse.json({ error: "SUPABASE_NOT_CONFIGURED", missing }, { status: 500 });
+  }
 
   const [
     monitorsRes,

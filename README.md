@@ -14,7 +14,7 @@ Open http://localhost:3000
 ## Supabase Setup (No Login / Server-Key Mode)
 
 This build is designed for private/admin deployments. It can run with:
-- `NEXT_PUBLIC_SUPABASE_URL`
+- `SUPABASE_URL` (or `NEXT_PUBLIC_SUPABASE_URL`)
 - `SUPABASE_SERVICE_ROLE_KEY` (required for server route handlers)
 - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (optional, only needed if you later add client-side Supabase usage)
 
@@ -26,7 +26,7 @@ cp .env.example .env.local
 
 2) Fill in:
 
-- `NEXT_PUBLIC_SUPABASE_URL`
+- `SUPABASE_URL` (or `NEXT_PUBLIC_SUPABASE_URL`)
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (optional)
 
