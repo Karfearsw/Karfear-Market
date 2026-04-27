@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { insertEvent } from "@/lib/supabase/events";
+import type { PaymentType } from "@/lib/ksw/types";
+
+const paymentTypes: PaymentType[] = ["card", "paypal", "crypto", "unknown"];
 
 export async function POST(req: Request) {
   const supabase = createAdminClient();
@@ -12,35 +15,28 @@ export async function POST(req: Request) {
   }
 
   const b = body as Record<string, unknown>;
-  const store = typeof b.store === "string" ? b.store : "";
-  const storeType = typeof b.storeType === "string" ? b.storeType : "shopify";
-  const target = typeof b.target === "string" ? b.target : "";
-  const size = typeof b.size === "string" ? b.size : "OS";
-  const addOnIds = Array.isArray(b.addOnIds)
-    ? (b.addOnIds as unknown[]).filter((x) => typeof x === "string")
-    : [];
-  const profileId = typeof b.profileId === "string" ? b.profileId : null;
-  const proxyGroupId = typeof b.proxyGroupId === "string" ? b.proxyGroupId : null;
+  const name = typeof b.name === "string" ? b.name.trim() : "";
+  const shippingName = typeof b.shippingName === "string" ? b.shippingName.trim() : "";
+  const country = typeof b.country === "string" ? b.country.trim() : "";
+  const paymentType = typeof b.paymentType === "string" ? (b.paymentType as PaymentType) : "unknown";
+  const isDefault = typeof b.isDefault === "boolean" ? b.isDefault : false;
 
-  if (!store || !target) {
+  if (!name || !shippingName || !country || !paymentTypes.includes(paymentType)) {
     return NextResponse.json({ error: "MISSING_FIELDS" }, { status: 400 });
   }
 
+  if (isDefault) {
+    await supabase.from("profiles").update({ is_default: false }).neq("is_default", false);
+  }
+
   const res = await supabase
-    .from("tasks")
+    .from("profiles")
     .insert({
-      store,
-      store_type: storeType,
-      target,
-      size,
-      add_on_ids: addOnIds,
-      profile_id: profileId,
-      proxy_group_id: proxyGroupId,
-      status: "queued",
-      step: "init",
-      retries: 0,
-      last_http_status: null,
-      last_update_at: new Date().toISOString(),
+      name,
+      shipping_name: shippingName,
+      country,
+      payment_type: paymentType,
+      is_default: isDefault,
     })
     .select("id")
     .single();
@@ -50,10 +46,11 @@ export async function POST(req: Request) {
   }
 
   await insertEvent(supabase, {
-    type: "task_created",
+    type: "profile_created",
     severity: "success",
-    message: `Task created: ${store} • ${target}`,
+    message: `Profile created: ${name}`,
   });
 
   return NextResponse.json({ id: String(res.data.id) });
 }
+

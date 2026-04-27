@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { insertEvent } from "@/lib/supabase/events";
 
 export async function POST(_: Request, ctx: { params: Promise<{ id: string }> }) {
   const supabase = createAdminClient();
@@ -29,6 +30,12 @@ export async function POST(_: Request, ctx: { params: Promise<{ id: string }> })
   if (res.error) {
     return NextResponse.json({ error: "SUPABASE_UPDATE_FAILED", details: res.error.message }, { status: 500 });
   }
+
+  await insertEvent(supabase, {
+    type: "task_retried",
+    severity: "warn",
+    message: `Task retried: ${id} (retries=${retries})`,
+  });
 
   return NextResponse.json({ id: String(res.data.id) });
 }
