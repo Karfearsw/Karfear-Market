@@ -114,6 +114,7 @@ create table if not exists public.tasks (
   add_on_ids uuid[] not null default '{}',
   profile_id uuid references public.profiles(id) on delete set null,
   proxy_group_id uuid references public.proxy_groups(id) on delete set null,
+  pinned boolean not null default false,
   status text not null,
   step text not null,
   retries integer not null default 0,
@@ -127,18 +128,32 @@ create table if not exists public.tasks (
 
 create index if not exists tasks_last_update_at_idx on public.tasks(last_update_at);
 create index if not exists tasks_status_idx on public.tasks(status);
+create index if not exists tasks_pinned_idx on public.tasks(pinned);
 
 create table if not exists public.adapters (
   id uuid primary key default gen_random_uuid(),
   name text not null,
   type text not null,
-  connected boolean not null default true,
+  base_url text,
+  config jsonb not null default '{}'::jsonb,
+  connected boolean not null default false,
+  last_error text,
+  last_checked_at timestamptz,
   capabilities text[] not null default '{}',
   last_sync_at timestamptz not null default now(),
   created_at timestamptz not null default now()
 );
 
 create index if not exists adapters_connected_idx on public.adapters(connected);
+
+create table if not exists public.engine_state (
+  id integer primary key default 1,
+  queue_paused boolean not null default false,
+  updated_at timestamptz not null default now(),
+  constraint engine_state_singleton_check check (id = 1)
+);
+
+insert into public.engine_state(id) values (1) on conflict do nothing;
 
 create table if not exists public.events (
   id uuid primary key default gen_random_uuid(),
@@ -161,6 +176,6 @@ grant select, insert, update, delete on table
   public.monitors,
   public.tasks,
   public.adapters,
+  public.engine_state,
   public.events
 to anon, authenticated;
-
