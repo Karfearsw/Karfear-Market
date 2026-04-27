@@ -163,3 +163,4 @@ grant select, insert, update, delete on table
   public.adapters,
   public.events
 to anon, authenticated;
+
