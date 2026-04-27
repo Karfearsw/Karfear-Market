@@ -46,7 +46,7 @@ export default function DashboardPage() {
         <KpiTile
           label="Tasks Running"
           value={`${kpis.runningTasks}`}
-          hint="Mock realtime updates"
+          hint="Polled from /api/state"
           icon={<Activity className="h-5 w-5" />}
           accent="primary"
         />

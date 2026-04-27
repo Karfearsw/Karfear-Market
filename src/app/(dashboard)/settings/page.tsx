@@ -16,18 +16,18 @@ export default function SettingsPage() {
           <div className="flex items-center justify-between">
             <div className="text-sm text-muted-foreground">Realtime mode</div>
             <Badge className="rounded-full bg-primary/15 text-primary hover:bg-primary/20">
-              mock
+              polling
             </Badge>
           </div>
           <div className="mt-3 text-sm text-muted-foreground">
-            Swap the provider implementation to SSE/WebSocket when the bot backend is ready.
+            Upgrade to SSE/WebSocket when the bot backend is ready.
           </div>
         </CardContent>
       </Card>
       <Card className="border-border/70 bg-card/50">
         <CardHeader className="pb-3">
           <CardTitle className="font-heading tracking-[0.14em] uppercase text-sm">
-            Preferences (UI only)
+            Preferences
           </CardTitle>
         </CardHeader>
         <CardContent className="pt-0">
@@ -39,4 +39,3 @@ export default function SettingsPage() {
     </div>
   );
 }
-

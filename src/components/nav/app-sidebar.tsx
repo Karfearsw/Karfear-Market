@@ -16,6 +16,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
+import { useKswData } from "@/lib/ksw/provider";
 
 const navItems = [
   { href: "/", label: "Dashboard", icon: Gauge },
@@ -31,6 +32,7 @@ const navItems = [
 
 export function AppSidebar() {
   const pathname = usePathname();
+  const { state } = useKswData();
 
   return (
     <aside className="hidden md:flex w-[280px] shrink-0 border-r border-border/70 bg-sidebar text-sidebar-foreground">
@@ -100,10 +102,10 @@ export function AppSidebar() {
         <div className="px-5 py-4">
           <div className="flex items-center justify-between">
             <div className="text-xs text-muted-foreground">Engine</div>
-            <div className="text-xs text-primary">Mock</div>
+            <div className="text-xs text-primary">{state.engine.queuePaused ? "Paused" : "Live"}</div>
           </div>
           <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-sidebar-accent/70">
-            <div className="h-full w-2/3 bg-primary/80" />
+            <div className={cn("h-full bg-primary/80", state.engine.queuePaused ? "w-1/4" : "w-full")} />
           </div>
         </div>
       </div>

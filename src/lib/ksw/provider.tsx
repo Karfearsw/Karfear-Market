@@ -19,6 +19,7 @@ const emptyState: KswState = {
   proxies: [],
   adapters: [],
   events: [],
+  engine: { queuePaused: false, updatedAt: 0 },
 };
 
 function computeKpis(state: KswState): Kpis {

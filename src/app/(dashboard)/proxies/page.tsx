@@ -1,8 +1,10 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import {
   Table,
   TableBody,
@@ -11,45 +13,20 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Textarea } from "@/components/ui/textarea";
 import { useKswData } from "@/lib/ksw/provider";
 import { cn } from "@/lib/utils";
 
-function sparklinePoints(seed: string, base: number) {
-  const s = seed.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0);
-  return Array.from({ length: 16 }).map((_, i) => {
-    const wave = Math.sin((i + s) * 0.7) * 0.35 + Math.cos((i + s) * 0.33) * 0.2;
-    return base + wave * base * 0.12;
-  });
-}
-
-function Sparkline({ values }: { values: number[] }) {
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const norm = values.map((v) => (max === min ? 0.5 : (v - min) / (max - min)));
-  const points = norm
-    .map((v, i) => {
-      const x = (i / (norm.length - 1)) * 100;
-      const y = 100 - v * 100;
-      return `${x.toFixed(2)},${y.toFixed(2)}`;
-    })
-    .join(" ");
-
-  return (
-    <svg viewBox="0 0 100 100" className="h-8 w-28">
-      <polyline
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="4"
-        strokeLinejoin="round"
-        strokeLinecap="round"
-        points={points}
-      />
-    </svg>
-  );
-}
-
 export default function ProxiesPage() {
   const { state } = useKswData();
+  const [importOpen, setImportOpen] = useState(false);
+  const [raw, setRaw] = useState("");
+  const [groupName, setGroupName] = useState("");
+  const [editOpen, setEditOpen] = useState(false);
+  const [editGroupId, setEditGroupId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const rows = useMemo(() => {
     return state.proxies
@@ -60,16 +37,74 @@ export default function ProxiesPage() {
       .sort((a, b) => b.healthPct - a.healthPct);
   }, [state.proxies]);
 
+  async function callApi(path: string, init: RequestInit) {
+    setError(null);
+    setBusy(true);
+    try {
+      const res = await fetch(path, {
+        ...init,
+        headers: { "content-type": "application/json", ...(init.headers ?? {}) },
+      });
+      const payload = (await res.json().catch(() => null)) as unknown;
+      if (!res.ok) {
+        const msg =
+          payload && typeof payload === "object" && "error" in payload
+            ? String((payload as Record<string, unknown>).error)
+            : `HTTP_${res.status}`;
+        throw new Error(msg);
+      }
+      return payload;
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function openImport() {
+    setGroupName("");
+    setRaw("");
+    setError(null);
+    setImportOpen(true);
+  }
+
+  async function importProxies() {
+    await callApi("/api/proxies/import", { method: "POST", body: JSON.stringify({ raw, groupName }) });
+    setImportOpen(false);
+  }
+
+  async function testGroup(id: string) {
+    await callApi("/api/proxies/test", { method: "POST", body: JSON.stringify({ proxyGroupId: id }) });
+  }
+
+  function openEdit(id: string, name: string) {
+    setEditGroupId(id);
+    setEditName(name);
+    setError(null);
+    setEditOpen(true);
+  }
+
+  async function renameGroup() {
+    if (!editGroupId) return;
+    await callApi(`/api/proxy-groups/${editGroupId}`, { method: "PATCH", body: JSON.stringify({ name: editName }) });
+    setEditOpen(false);
+  }
+
+  async function deleteGroup() {
+    if (!editGroupId) return;
+    await callApi(`/api/proxy-groups/${editGroupId}`, { method: "DELETE" });
+    setEditOpen(false);
+  }
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <div className="text-sm text-muted-foreground">
-          Health and latency are simulated.
+          Import proxies, run health checks, and track group latency.
         </div>
-        <Button className="bg-primary text-primary-foreground hover:bg-primary/90">
+        <Button className="bg-primary text-primary-foreground hover:bg-primary/90" onClick={openImport}>
           Import Proxies
         </Button>
       </div>
+      {error && <div className="text-sm text-destructive">{error}</div>}
 
       <Card className="border-border/70 bg-card/50">
         <CardHeader className="pb-3">
@@ -85,7 +120,6 @@ export default function ProxiesPage() {
                   <TableHead>Name</TableHead>
                   <TableHead>Healthy</TableHead>
                   <TableHead>Avg Latency</TableHead>
-                  <TableHead>Trend</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -116,13 +150,27 @@ export default function ProxiesPage() {
                     <TableCell className="text-sm tabular-nums">
                       {g.avgLatencyMs}ms
                     </TableCell>
-                    <TableCell className="text-primary">
-                      <Sparkline values={sparklinePoints(g.name, g.avgLatencyMs)} />
-                    </TableCell>
                     <TableCell className="text-right">
-                      <Button variant="outline" size="sm" className="bg-card/30">
-                        Edit
-                      </Button>
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="bg-card/30"
+                          onClick={() => void testGroup(g.id).catch((e) => setError(String(e.message ?? e)))}
+                          disabled={busy}
+                        >
+                          Test
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="bg-card/30"
+                          onClick={() => openEdit(g.id, g.name)}
+                          disabled={busy}
+                        >
+                          Edit
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -131,7 +179,75 @@ export default function ProxiesPage() {
           </div>
         </CardContent>
       </Card>
+
+      <Dialog open={importOpen} onOpenChange={setImportOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Import Proxies</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <div className="text-xs text-muted-foreground">Proxy Group Name</div>
+              <Input value={groupName} onChange={(e) => setGroupName(e.target.value)} className="bg-card/40" />
+            </div>
+            <div className="space-y-1">
+              <div className="text-xs text-muted-foreground">Proxies</div>
+              <Textarea
+                value={raw}
+                onChange={(e) => setRaw(e.target.value)}
+                placeholder={`host:port\nhost:port:user:pass\nuser:pass@host:port`}
+                className="bg-card/40"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" className="bg-card/30" onClick={() => setImportOpen(false)} disabled={busy}>
+              Cancel
+            </Button>
+            <Button
+              className="bg-primary text-primary-foreground hover:bg-primary/90"
+              onClick={() => void importProxies().catch((e) => setError(String(e.message ?? e)))}
+              disabled={busy}
+            >
+              Import
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit Proxy Group</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <div className="text-xs text-muted-foreground">Name</div>
+              <Input value={editName} onChange={(e) => setEditName(e.target.value)} className="bg-card/40" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              className="bg-card/30 mr-auto"
+              onClick={() => void deleteGroup().catch((e) => setError(String(e.message ?? e)))}
+              disabled={busy || !editGroupId}
+            >
+              Delete
+            </Button>
+            <Button variant="outline" className="bg-card/30" onClick={() => setEditOpen(false)} disabled={busy}>
+              Cancel
+            </Button>
+            <Button
+              className="bg-primary text-primary-foreground hover:bg-primary/90"
+              onClick={() => void renameGroup().catch((e) => setError(String(e.message ?? e)))}
+              disabled={busy || !editGroupId}
+            >
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
-

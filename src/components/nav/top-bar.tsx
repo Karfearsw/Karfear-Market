@@ -17,6 +17,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
+import { useKswData } from "@/lib/ksw/provider";
 
 const titles: Record<string, { title: string; subtitle: string }> = {
   "/": { title: "Dashboard", subtitle: "Live overview and latest events." },
@@ -30,7 +31,7 @@ const titles: Record<string, { title: string; subtitle: string }> = {
     title: "Store Adapters",
     subtitle: "Shopify test stores and hybrid connectors.",
   },
-  "/settings": { title: "Settings", subtitle: "Dashboard preferences (UI only)." },
+  "/settings": { title: "Settings", subtitle: "Dashboard preferences." },
 };
 
 const navItems = [
@@ -47,6 +48,7 @@ const navItems = [
 
 export function TopBar() {
   const pathname = usePathname();
+  const { state } = useKswData();
 
   const heading = useMemo(() => {
     const match = Object.keys(titles)
@@ -109,7 +111,7 @@ export function TopBar() {
               {heading.title}
             </h1>
             <Badge className="rounded-full bg-primary/15 text-primary hover:bg-primary/20">
-              Mock realtime
+              {state.engine.queuePaused ? "Queue paused" : "Polling"}
             </Badge>
           </div>
           <p className="mt-1 text-sm text-muted-foreground">{heading.subtitle}</p>

@@ -1,9 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ChevronRight, Search } from "lucide-react";
+import { ChevronRight, Pin, Search } from "lucide-react";
 import { HatStockBadge } from "@/components/ksw/hat-badge";
 import { TaskStatusBadge } from "@/components/ksw/status-badge";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -35,6 +36,8 @@ export default function TasksPage() {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<TaskStatus | "all">("all");
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const hatById = useMemo(() => {
     return new Map(state.hatAddOns.map((h) => [h.id, h]));
@@ -54,7 +57,7 @@ export default function TasksPage() {
           t.proxyGroupName.toLowerCase().includes(q)
         );
       })
-      .sort((a, b) => b.lastUpdateAt - a.lastUpdateAt);
+      .sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.lastUpdateAt - a.lastUpdateAt);
   }, [query, state.tasks, status]);
 
   const selected = selectedTaskId ? getTaskById(selectedTaskId) : undefined;
@@ -64,6 +67,57 @@ export default function TasksPage() {
       .map((id) => hatById.get(id))
       .filter((h): h is HatAddOn => h !== undefined);
   }, [hatById, selected]);
+
+  async function callApi(path: string, init: RequestInit) {
+    setError(null);
+    setBusy(true);
+    try {
+      const res = await fetch(path, {
+        ...init,
+        headers: { "content-type": "application/json", ...(init.headers ?? {}) },
+      });
+      const payload = (await res.json().catch(() => null)) as unknown;
+      if (!res.ok) {
+        const msg =
+          payload && typeof payload === "object" && "error" in payload
+            ? String((payload as Record<string, unknown>).error)
+            : `HTTP_${res.status}`;
+        throw new Error(msg);
+      }
+      return payload;
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function toggleQueue() {
+    await callApi("/api/engine/queue", {
+      method: "PATCH",
+      body: JSON.stringify({ queuePaused: !state.engine.queuePaused }),
+    });
+  }
+
+  async function startTasks() {
+    if (state.engine.queuePaused) {
+      await callApi("/api/engine/queue", {
+        method: "PATCH",
+        body: JSON.stringify({ queuePaused: false }),
+      });
+    }
+    await callApi("/api/tasks/batch/requeue", { method: "POST" });
+  }
+
+  async function stopTask(id: string) {
+    await callApi(`/api/tasks/${id}/cancel`, { method: "POST" });
+  }
+
+  async function retryTask(id: string) {
+    await callApi(`/api/tasks/${id}/retry`, { method: "POST" });
+  }
+
+  async function togglePinned(id: string, pinned: boolean) {
+    await callApi(`/api/tasks/${id}`, { method: "PATCH", body: JSON.stringify({ pinned }) });
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -92,14 +146,24 @@ export default function TasksPage() {
           </Tabs>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" className="bg-card/30">
-            Pause Queue
+          <Button
+            variant="outline"
+            className="bg-card/30"
+            onClick={() => void toggleQueue().catch((e) => setError(String(e.message ?? e)))}
+            disabled={busy}
+          >
+            {state.engine.queuePaused ? "Resume Queue" : "Pause Queue"}
           </Button>
-          <Button className="bg-primary text-primary-foreground hover:bg-primary/90">
+          <Button
+            className="bg-primary text-primary-foreground hover:bg-primary/90"
+            onClick={() => void startTasks().catch((e) => setError(String(e.message ?? e)))}
+            disabled={busy}
+          >
             Start Tasks
           </Button>
         </div>
       </div>
+      {error && <div className="text-sm text-destructive">{error}</div>}
 
       <Card className="border-border/70 bg-card/50">
         <CardHeader className="pb-3">
@@ -129,7 +193,14 @@ export default function TasksPage() {
                 {filtered.map((t) => (
                   <TableRow key={t.id} className="cursor-pointer">
                     <TableCell className="font-mono text-xs text-muted-foreground">
-                      {t.id.slice(0, 10)}…
+                      <div className="flex items-center gap-2">
+                        {t.pinned && (
+                          <Badge className="rounded-full bg-primary/15 text-primary hover:bg-primary/20">
+                            pinned
+                          </Badge>
+                        )}
+                        <span>{t.id.slice(0, 10)}…</span>
+                      </div>
                     </TableCell>
                     <TableCell className="text-sm">{t.storeType}</TableCell>
                     <TableCell className="text-sm">{t.target}</TableCell>
@@ -263,19 +334,48 @@ export default function TasksPage() {
                 <Card className="border-border/70 bg-card/50">
                   <CardHeader className="pb-2">
                     <CardTitle className="font-heading tracking-[0.14em] uppercase text-sm">
-                      Controls (UI only)
+                      Controls
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="pt-0">
                     <div className="flex items-center gap-2">
-                      <Button variant="outline" className="bg-card/30">
+                      <Button
+                        variant="outline"
+                        className="bg-card/30"
+                        onClick={() =>
+                          selected
+                            ? void stopTask(selected.id).catch((e) => setError(String(e.message ?? e)))
+                            : undefined
+                        }
+                        disabled={!selected || busy}
+                      >
                         Stop
                       </Button>
-                      <Button variant="outline" className="bg-card/30">
+                      <Button
+                        variant="outline"
+                        className="bg-card/30"
+                        onClick={() =>
+                          selected
+                            ? void retryTask(selected.id).catch((e) => setError(String(e.message ?? e)))
+                            : undefined
+                        }
+                        disabled={!selected || busy}
+                      >
                         Retry
                       </Button>
-                      <Button className="bg-primary text-primary-foreground hover:bg-primary/90">
-                        Pin
+                      <Button
+                        className="bg-primary text-primary-foreground hover:bg-primary/90"
+                        onClick={() =>
+                          selected
+                            ? void togglePinned(selected.id, !selected.pinned).catch((e) =>
+                                setError(String(e.message ?? e))
+                              )
+                            : undefined
+                        }
+                        disabled={!selected || busy}
+                      >
+                        <Pin className="h-4 w-4" />
+                        <span className="ml-2">{selected?.pinned ? "Unpin" : "Pin"}</span>
                       </Button>
                     </div>
                   </CardContent>
