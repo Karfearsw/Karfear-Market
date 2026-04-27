@@ -3,7 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const supabase = createAdminClient();
-  if (!supabase) return NextResponse.json({ error: "SUPABASE_NOT_CONFIGURED" }, { status: 400 });
+  if (!supabase) return NextResponse.json({ error: "SUPABASE_NOT_CONFIGURED" }, { status: 500 });
 
   const { id } = await ctx.params;
   const body = (await req.json().catch(() => null)) as unknown;
@@ -28,4 +28,3 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
 
   return NextResponse.json({ id: String(res.data.id) });
 }
-

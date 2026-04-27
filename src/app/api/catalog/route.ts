@@ -3,9 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 export async function GET(req: Request) {
   const supabase = createAdminClient();
-  if (!supabase) {
-    return NextResponse.json({ items: [] });
-  }
+  if (!supabase) return NextResponse.json({ error: "SUPABASE_NOT_CONFIGURED" }, { status: 500 });
 
   const url = new URL(req.url);
   const category = url.searchParams.get("category");
@@ -63,4 +61,3 @@ export async function GET(req: Request) {
 
   return NextResponse.json({ items, variants });
 }
-

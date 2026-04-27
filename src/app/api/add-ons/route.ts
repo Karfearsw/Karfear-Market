@@ -3,7 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 export async function POST(req: Request) {
   const supabase = createAdminClient();
-  if (!supabase) return NextResponse.json({ error: "SUPABASE_NOT_CONFIGURED" }, { status: 400 });
+  if (!supabase) return NextResponse.json({ error: "SUPABASE_NOT_CONFIGURED" }, { status: 500 });
 
   const body = (await req.json().catch(() => null)) as unknown;
   if (!body || typeof body !== "object") {
@@ -48,4 +48,3 @@ export async function POST(req: Request) {
 
   return NextResponse.json({ id: String(res.data.id) });
 }
-
