@@ -36,6 +36,8 @@ export type PaymentType = "card" | "paypal" | "crypto" | "unknown";
 export type EventType =
   | "restock"
   | "hat_restock"
+  | "add_on_created"
+  | "add_on_updated"
   | "task_created"
   | "task_started"
   | "task_progress"
@@ -43,6 +45,8 @@ export type EventType =
   | "task_failed"
   | "task_canceled"
   | "task_retried"
+  | "queue_paused"
+  | "queue_resumed"
   | "monitor_updated"
   | "monitor_enabled"
   | "monitor_disabled"
@@ -52,6 +56,9 @@ export type EventType =
   | "proxies_imported"
   | "proxies_tested"
   | "proxy_degraded"
+  | "proxy_group_updated"
+  | "adapter_created"
+  | "adapter_updated"
   | "adapter_connected"
   | "adapter_disconnected";
 
@@ -96,6 +103,7 @@ export interface Task {
   addOnIds: Id[];
   profileName: string;
   proxyGroupName: string;
+  pinned: boolean;
   status: TaskStatus;
   step: TaskStep;
   retries: number;
@@ -125,8 +133,11 @@ export interface Adapter {
   name: string;
   type: StoreType;
   connected: boolean;
+  baseUrl?: string;
+  lastError?: string;
   capabilities: AdapterCapability[];
   lastSyncAt: number;
+  lastCheckedAt?: number;
 }
 
 export interface KswEvent {
@@ -137,6 +148,11 @@ export interface KswEvent {
   at: number;
 }
 
+export interface EngineState {
+  queuePaused: boolean;
+  updatedAt: number;
+}
+
 export interface KswState {
   monitors: Monitor[];
   tasks: Task[];
@@ -145,6 +161,7 @@ export interface KswState {
   proxies: ProxyGroup[];
   adapters: Adapter[];
   events: KswEvent[];
+  engine: EngineState;
 }
 
 export interface Kpis {

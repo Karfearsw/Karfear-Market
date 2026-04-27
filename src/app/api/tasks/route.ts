@@ -6,6 +6,11 @@ export async function POST(req: Request) {
   const supabase = createAdminClient();
   if (!supabase) return NextResponse.json({ error: "SUPABASE_NOT_CONFIGURED" }, { status: 500 });
 
+  const engineRes = await supabase.from("engine_state").select("queue_paused").eq("id", 1).single();
+  if (engineRes.error) {
+    return NextResponse.json({ error: "SUPABASE_QUERY_FAILED", details: engineRes.error.message }, { status: 500 });
+  }
+
   const body = (await req.json().catch(() => null)) as unknown;
   if (!body || typeof body !== "object") {
     return NextResponse.json({ error: "INVALID_BODY" }, { status: 400 });
@@ -36,7 +41,7 @@ export async function POST(req: Request) {
       add_on_ids: addOnIds,
       profile_id: profileId,
       proxy_group_id: proxyGroupId,
-      status: "queued",
+      status: engineRes.data.queue_paused ? "paused" : "queued",
       step: "init",
       retries: 0,
       last_http_status: null,

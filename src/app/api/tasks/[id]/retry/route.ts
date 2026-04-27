@@ -8,6 +8,11 @@ export async function POST(_: Request, ctx: { params: Promise<{ id: string }> })
 
   const { id } = await ctx.params;
 
+  const engineRes = await supabase.from("engine_state").select("queue_paused").eq("id", 1).single();
+  if (engineRes.error) {
+    return NextResponse.json({ error: "SUPABASE_QUERY_FAILED", details: engineRes.error.message }, { status: 500 });
+  }
+
   const current = await supabase.from("tasks").select("retries").eq("id", id).single();
   if (current.error) {
     return NextResponse.json({ error: "SUPABASE_QUERY_FAILED", details: current.error.message }, { status: 500 });
@@ -18,7 +23,7 @@ export async function POST(_: Request, ctx: { params: Promise<{ id: string }> })
   const res = await supabase
     .from("tasks")
     .update({
-      status: "queued",
+      status: engineRes.data.queue_paused ? "paused" : "queued",
       step: "init",
       retries,
       last_update_at: new Date().toISOString(),

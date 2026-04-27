@@ -1,5 +1,18 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { insertEvent } from "@/lib/supabase/events";
+import type { ProductCategory, StoreType } from "@/lib/ksw/types";
+
+const storeTypes: StoreType[] = ["shopify", "hybrid"];
+const categories: ProductCategory[] = [
+  "tops",
+  "shoes",
+  "pants",
+  "hats",
+  "outerwear",
+  "accessories",
+  "other",
+];
 
 export async function POST(req: Request) {
   const supabase = createAdminClient();
@@ -12,13 +25,13 @@ export async function POST(req: Request) {
 
   const b = body as Record<string, unknown>;
   const store = typeof b.store === "string" ? b.store : "";
-  const storeType = typeof b.storeType === "string" ? b.storeType : "shopify";
-  const category = typeof b.category === "string" ? b.category : "other";
+  const storeType = typeof b.storeType === "string" ? (b.storeType as StoreType) : "shopify";
+  const category = typeof b.category === "string" ? (b.category as ProductCategory) : "other";
   const query = typeof b.query === "string" ? b.query : "";
   const sizes = Array.isArray(b.sizes) ? (b.sizes as unknown[]).filter((s) => typeof s === "string") : [];
   const enabled = typeof b.enabled === "boolean" ? b.enabled : true;
 
-  if (!store || !query) {
+  if (!store || !query || !storeTypes.includes(storeType) || !categories.includes(category)) {
     return NextResponse.json({ error: "MISSING_FIELDS" }, { status: 400 });
   }
 
@@ -38,6 +51,12 @@ export async function POST(req: Request) {
   if (res.error) {
     return NextResponse.json({ error: "SUPABASE_INSERT_FAILED", details: res.error.message }, { status: 500 });
   }
+
+  await insertEvent(supabase, {
+    type: "monitor_updated",
+    severity: "success",
+    message: `Monitor created: ${query}`,
+  });
 
   return NextResponse.json({ id: String(res.data.id) });
 }

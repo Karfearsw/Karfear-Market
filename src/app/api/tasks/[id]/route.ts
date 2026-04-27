@@ -50,6 +50,8 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   if (typeof b.profileId === "string" || b.profileId === null) patch.profile_id = b.profileId;
   if (typeof b.proxyGroupId === "string" || b.proxyGroupId === null) patch.proxy_group_id = b.proxyGroupId;
 
+  if (typeof b.pinned === "boolean") patch.pinned = b.pinned;
+
   if (Array.isArray(b.addOnIds)) {
     patch.add_on_ids = (b.addOnIds as unknown[]).filter((x) => typeof x === "string");
   }
@@ -95,4 +97,3 @@ export async function DELETE(_: Request, ctx: { params: Promise<{ id: string }> 
 
   return NextResponse.json({ id: String(res.data.id) });
 }
-

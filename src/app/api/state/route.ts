@@ -46,6 +46,8 @@ const severities: Severity[] = ["info", "warn", "error", "success"];
 const eventTypes: EventType[] = [
   "restock",
   "hat_restock",
+  "add_on_created",
+  "add_on_updated",
   "task_created",
   "task_started",
   "task_progress",
@@ -53,6 +55,8 @@ const eventTypes: EventType[] = [
   "task_failed",
   "task_canceled",
   "task_retried",
+  "queue_paused",
+  "queue_resumed",
   "monitor_updated",
   "monitor_enabled",
   "monitor_disabled",
@@ -62,6 +66,9 @@ const eventTypes: EventType[] = [
   "proxies_imported",
   "proxies_tested",
   "proxy_degraded",
+  "proxy_group_updated",
+  "adapter_created",
+  "adapter_updated",
   "adapter_connected",
   "adapter_disconnected",
 ];
@@ -117,6 +124,7 @@ export async function GET() {
     proxiesRes,
     adaptersRes,
     eventsRes,
+    engineRes,
   ] = await Promise.all([
     supabase.from("monitors").select("*").order("created_at", { ascending: false }),
     supabase.from("tasks").select("*").order("last_update_at", { ascending: false }),
@@ -125,6 +133,7 @@ export async function GET() {
     supabase.from("proxy_groups").select("*").order("created_at", { ascending: false }),
     supabase.from("adapters").select("*").order("created_at", { ascending: false }),
     supabase.from("events").select("*").order("at", { ascending: false }).limit(48),
+    supabase.from("engine_state").select("*").eq("id", 1).single(),
   ]);
 
   if (
@@ -134,7 +143,8 @@ export async function GET() {
     profilesRes.error ||
     proxiesRes.error ||
     adaptersRes.error ||
-    eventsRes.error
+    eventsRes.error ||
+    engineRes.error
   ) {
     return NextResponse.json(
       {
@@ -147,6 +157,7 @@ export async function GET() {
           proxies: proxiesRes.error?.message,
           adapters: adaptersRes.error?.message,
           events: eventsRes.error?.message,
+          engine_state: engineRes.error?.message,
         },
       },
       { status: 500 }
@@ -174,6 +185,7 @@ export async function GET() {
       addOnIds: Array.isArray(t.add_on_ids) ? (t.add_on_ids as string[]) : [],
       profileName: "",
       proxyGroupName: "",
+      pinned: Boolean(t.pinned),
       status: asTaskStatus(t.status),
       step: asTaskStep(t.step),
       retries: Number(t.retries ?? 0),
@@ -212,8 +224,11 @@ export async function GET() {
       name: String(a.name),
       type: a.type === "hybrid" ? "hybrid" : "shopify",
       connected: Boolean(a.connected),
+      baseUrl: a.base_url ? String(a.base_url) : undefined,
+      lastError: a.last_error ? String(a.last_error) : undefined,
       capabilities: asCapabilities(a.capabilities),
       lastSyncAt: new Date(String(a.last_sync_at)).getTime(),
+      lastCheckedAt: a.last_checked_at ? new Date(String(a.last_checked_at)).getTime() : undefined,
     })),
     events: (eventsRes.data ?? []).map((e) => ({
       id: String(e.id),
@@ -222,6 +237,10 @@ export async function GET() {
       message: String(e.message),
       at: new Date(String(e.at)).getTime(),
     })),
+    engine: {
+      queuePaused: Boolean(engineRes.data.queue_paused),
+      updatedAt: new Date(String(engineRes.data.updated_at)).getTime(),
+    },
   };
 
   const profileNameById = new Map(state.profiles.map((p) => [p.id, p.name]));
