@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { apiJson } from "@/lib/api-client";
 import { useKswData } from "@/lib/ksw/provider";
 import type { Adapter, AdapterCapability, StoreType } from "@/lib/ksw/types";
 
@@ -67,19 +68,7 @@ export default function AdaptersPage() {
     setError(null);
     setBusy(true);
     try {
-      const res = await fetch(path, {
-        ...init,
-        headers: { "content-type": "application/json", ...(init.headers ?? {}) },
-      });
-      const payload = (await res.json().catch(() => null)) as unknown;
-      if (!res.ok) {
-        const msg =
-          payload && typeof payload === "object" && "error" in payload
-            ? String((payload as Record<string, unknown>).error)
-            : `HTTP_${res.status}`;
-        throw new Error(msg);
-      }
-      return payload;
+      return await apiJson(path, init);
     } finally {
       setBusy(false);
     }

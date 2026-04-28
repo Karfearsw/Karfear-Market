@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useKswData } from "@/lib/ksw/provider";
+import { apiJson } from "@/lib/api-client";
 import type { HatAddOn, TaskStatus } from "@/lib/ksw/types";
 
 function formatTime(ts: number) {
@@ -72,19 +73,7 @@ export default function TasksPage() {
     setError(null);
     setBusy(true);
     try {
-      const res = await fetch(path, {
-        ...init,
-        headers: { "content-type": "application/json", ...(init.headers ?? {}) },
-      });
-      const payload = (await res.json().catch(() => null)) as unknown;
-      if (!res.ok) {
-        const msg =
-          payload && typeof payload === "object" && "error" in payload
-            ? String((payload as Record<string, unknown>).error)
-            : `HTTP_${res.status}`;
-        throw new Error(msg);
-      }
-      return payload;
+      return await apiJson(path, init);
     } finally {
       setBusy(false);
     }
