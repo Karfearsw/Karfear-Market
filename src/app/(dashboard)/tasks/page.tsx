@@ -7,6 +7,7 @@ import { TaskStatusBadge } from "@/components/ksw/status-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -26,7 +27,7 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useKswData } from "@/lib/ksw/provider";
 import { apiJson } from "@/lib/api-client";
-import type { HatAddOn, TaskStatus } from "@/lib/ksw/types";
+import type { HatAddOn, StoreType, TaskStatus } from "@/lib/ksw/types";
 
 function formatTime(ts: number) {
   return new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -39,6 +40,14 @@ export default function TasksPage() {
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [newOpen, setNewOpen] = useState(false);
+  const [newStore, setNewStore] = useState("");
+  const [newStoreType, setNewStoreType] = useState<StoreType>("shopify");
+  const [newTarget, setNewTarget] = useState("");
+  const [newSize, setNewSize] = useState("OS");
+  const [newProfileId, setNewProfileId] = useState<string | null>(null);
+  const [newProxyGroupId, setNewProxyGroupId] = useState<string | null>(null);
+  const [newAddOnIds, setNewAddOnIds] = useState<string[]>([]);
 
   const hatById = useMemo(() => {
     return new Map(state.hatAddOns.map((h) => [h.id, h]));
@@ -108,6 +117,45 @@ export default function TasksPage() {
     await callApi(`/api/tasks/${id}`, { method: "PATCH", body: JSON.stringify({ pinned }) });
   }
 
+  function openNewTask() {
+    const defaultProfile = state.profiles.find((p) => p.isDefault)?.id ?? null;
+    setNewStore("");
+    setNewStoreType("shopify");
+    setNewTarget("");
+    setNewSize("OS");
+    setNewProfileId(defaultProfile);
+    setNewProxyGroupId(null);
+    setNewAddOnIds([]);
+    setNewOpen(true);
+  }
+
+  function toggleAddOn(id: string) {
+    setNewAddOnIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  }
+
+  async function createTask() {
+    const payload = await callApi("/api/tasks", {
+      method: "POST",
+      body: JSON.stringify({
+        store: newStore,
+        storeType: newStoreType,
+        target: newTarget,
+        size: newSize,
+        profileId: newProfileId,
+        proxyGroupId: newProxyGroupId,
+        addOnIds: newAddOnIds,
+      }),
+    });
+
+    const id =
+      payload && typeof payload === "object" && "id" in payload
+        ? String((payload as Record<string, unknown>).id)
+        : null;
+
+    setNewOpen(false);
+    if (id) setSelectedTaskId(id);
+  }
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
@@ -135,6 +183,9 @@ export default function TasksPage() {
           </Tabs>
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="outline" className="bg-card/30" onClick={openNewTask} disabled={busy}>
+            New Task
+          </Button>
           <Button
             variant="outline"
             className="bg-card/30"
@@ -374,6 +425,140 @@ export default function TasksPage() {
           </div>
         </SheetContent>
       </Sheet>
+
+      <Dialog open={newOpen} onOpenChange={setNewOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>New Task</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <div className="text-xs text-muted-foreground">Store</div>
+              <Input value={newStore} onChange={(e) => setNewStore(e.target.value)} className="bg-card/40" />
+            </div>
+            <div className="space-y-1">
+              <div className="text-xs text-muted-foreground">Store Type</div>
+              <Tabs value={newStoreType} onValueChange={(v) => setNewStoreType(v as StoreType)}>
+                <TabsList className="bg-card/40">
+                  <TabsTrigger value="shopify">Shopify</TabsTrigger>
+                  <TabsTrigger value="hybrid">Hybrid</TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
+            <div className="space-y-1">
+              <div className="text-xs text-muted-foreground">Target (URL or keywords)</div>
+              <Input value={newTarget} onChange={(e) => setNewTarget(e.target.value)} className="bg-card/40" />
+            </div>
+            <div className="space-y-1">
+              <div className="text-xs text-muted-foreground">Size</div>
+              <Input value={newSize} onChange={(e) => setNewSize(e.target.value)} className="bg-card/40" />
+            </div>
+
+            <div className="space-y-1">
+              <div className="text-xs text-muted-foreground">Profile (optional)</div>
+              {state.profiles.length === 0 ? (
+                <div className="text-sm text-muted-foreground">
+                  No profiles found. Create one in Profiles if your runner requires shipping/payment data.
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className={newProfileId === null ? "bg-primary/15 text-primary border-primary/25" : "bg-card/30"}
+                    onClick={() => setNewProfileId(null)}
+                    disabled={busy}
+                  >
+                    None
+                  </Button>
+                  {state.profiles.map((p) => (
+                    <Button
+                      key={p.id}
+                      variant="outline"
+                      size="sm"
+                      className={newProfileId === p.id ? "bg-primary/15 text-primary border-primary/25" : "bg-card/30"}
+                      onClick={() => setNewProfileId(p.id)}
+                      disabled={busy}
+                    >
+                      {p.name}
+                    </Button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-1">
+              <div className="text-xs text-muted-foreground">Proxy Group (optional)</div>
+              {state.proxies.length === 0 ? (
+                <div className="text-sm text-muted-foreground">
+                  No proxy groups found. Import proxies to run tasks through proxies.
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className={newProxyGroupId === null ? "bg-primary/15 text-primary border-primary/25" : "bg-card/30"}
+                    onClick={() => setNewProxyGroupId(null)}
+                    disabled={busy}
+                  >
+                    None
+                  </Button>
+                  {state.proxies.map((g) => (
+                    <Button
+                      key={g.id}
+                      variant="outline"
+                      size="sm"
+                      className={newProxyGroupId === g.id ? "bg-primary/15 text-primary border-primary/25" : "bg-card/30"}
+                      onClick={() => setNewProxyGroupId(g.id)}
+                      disabled={busy}
+                    >
+                      {g.name}
+                    </Button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-1">
+              <div className="text-xs text-muted-foreground">Hat Add-ons (optional)</div>
+              {state.hatAddOns.length === 0 ? (
+                <div className="text-sm text-muted-foreground">No hat add-ons found.</div>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {state.hatAddOns.map((h) => {
+                    const active = newAddOnIds.includes(h.id);
+                    return (
+                      <Button
+                        key={h.id}
+                        variant="outline"
+                        size="sm"
+                        className={active ? "bg-primary/15 text-primary border-primary/25" : "bg-card/30"}
+                        onClick={() => toggleAddOn(h.id)}
+                        disabled={busy}
+                      >
+                        {h.name}
+                      </Button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" className="bg-card/30" onClick={() => setNewOpen(false)} disabled={busy}>
+              Cancel
+            </Button>
+            <Button
+              className="bg-primary text-primary-foreground hover:bg-primary/90"
+              onClick={() => void createTask().catch((e) => setError(String(e.message ?? e)))}
+              disabled={busy}
+            >
+              Create Task
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
