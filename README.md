@@ -43,6 +43,6 @@ Alternatively, run the SQL migrations in order:
 
 ## Notes
 
-- No secrets are committed; `.env.local` is ignored by git.
+- Env files must never be committed; `.env.local`, `vercel-env.txt`, and other `.env.*` files are ignored by git. Copy `.env.example` to `.env.local` and fill in real values locally.
 - If Supabase env vars are not set, the API returns `SUPABASE_NOT_CONFIGURED` and the UI will not load data.
 - Proxy health checks run server-side via `undici` and rely on outbound connectivity from your deployment environment.

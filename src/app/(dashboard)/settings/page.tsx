@@ -21,9 +21,11 @@ export default function SettingsPage() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    const r = resolveApiBaseUrl();
-    setResolved(r);
-    setDraft(r.baseUrl);
+    queueMicrotask(() => {
+      const r = resolveApiBaseUrl();
+      setResolved(r);
+      setDraft(r.baseUrl);
+    });
   }, []);
 
   async function testHealth() {
